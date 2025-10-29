@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -7,6 +8,8 @@ public class GameUIController : MonoBehaviour
     private Label turnLabel;
     private Label resultLabel;
     private Button restartButton;
+    private Button slideButton;
+    private Label slideDirectionLabel;
     private VisualElement resultOverlay;
     private PlayerController localPlayerController;
     public bool playerRegistered = false;
@@ -34,11 +37,15 @@ public class GameUIController : MonoBehaviour
         var root = uiDocument.rootVisualElement;
         var turnBar = root.Q<VisualElement>("TurnBar");
         turnLabel = turnBar.Q<Label>("TurnLabel");
+        slideButton = turnBar.Q<Button>("SlideButton");
+        slideDirectionLabel = turnBar.Q<Label>("SlideDirectionLabel");
         resultLabel = root.Q<Label>("ResultLabel");
         restartButton = root.Q<Button>("RestartButton");
         resultOverlay = root.Q<VisualElement>("ResultOverlay");
         restartButton.clicked += OnRestartClicked;
         restartButton.text = "Restart";
+        slideButton.clicked += OnSlideClicked;
+        slideButton.text = "Slide";
     }
 
     void Update()
@@ -51,11 +58,24 @@ public class GameUIController : MonoBehaviour
         {
             UpdateResultLabel();
             UpdateRestartButton();
-            
+            slideButton.SetEnabled(false);
             return;
         }
 
         UpdateTurnLabelText();
+        UpdateSlideButton();
+    }
+
+    private void UpdateSlideButton()
+    {
+        if (localPlayerController == null || !localPlayerController.IsSpawned)
+        {
+            slideButton.SetEnabled(false);
+            return;
+        }
+        bool bothPlayersPresent = !NetworkManager.Singleton.IsHost || GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 2;
+        bool canSlide = bothPlayersPresent && !localPlayerController.hasUsedSlide.Value && GameStateManager.Instance.gameResult.Value == (int)GameResult.Ongoing;
+        slideButton.SetEnabled(canSlide);
     }
 
     private void UpdateOverlayAndTurnLabelVisibility(bool showOverlay)
@@ -123,5 +143,36 @@ public class GameUIController : MonoBehaviour
             GameStateManager.Instance.RequestRestartServerRpc(localId);
             restartButton.SetEnabled(false); // Disable button after click
         }
+    }
+
+    void OnSlideClicked()
+    {
+        if (localPlayerController == null) return;
+        // Pick a random direction
+        SlideDirection direction = (SlideDirection)Random.Range(0, 4);
+        localPlayerController.TrySlideBoard(direction);
+        slideButton.SetEnabled(false);
+        ShowSlideDirection(direction);
+    }
+
+    private void ShowSlideDirection(SlideDirection direction)
+    {
+        string dirText = direction switch
+        {
+            SlideDirection.Up => "Board slid UP!",
+            SlideDirection.Down => "Board slid DOWN!",
+            SlideDirection.Left => "Board slid LEFT!",
+            SlideDirection.Right => "Board slid RIGHT!",
+            _ => "Board slid!"
+        };
+        slideDirectionLabel.text = dirText;
+        slideDirectionLabel.style.display = DisplayStyle.Flex;
+        CancelInvoke(nameof(HideSlideDirection));
+        Invoke(nameof(HideSlideDirection), 1f);
+    }
+
+    private void HideSlideDirection()
+    {
+        slideDirectionLabel.style.display = DisplayStyle.None;
     }
 }

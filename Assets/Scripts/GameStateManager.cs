@@ -19,6 +19,14 @@ public enum GameResult
     Draw = 3
 }
 
+public enum SlideDirection
+{
+    Up,
+    Down,
+    Left,
+    Right
+}
+
 public class GameStateManager : NetworkBehaviour
 {
     // Track which players have requested a restart
@@ -29,6 +37,9 @@ public class GameStateManager : NetworkBehaviour
     public NetworkVariable<int> currentTurn = new NetworkVariable<int>((int)PlayerSymbol.X);
     public NetworkVariable<int> gameResult = new NetworkVariable<int>((int)GameResult.Ongoing);
 
+    // Store last slide direction for UI/animation
+    public SlideDirection lastSlideDirection = SlideDirection.Up;
+
     [Header("Prefabs & Materials")]
     public GameObject placeablePrefab;
     public Material xMaterial;
@@ -38,8 +49,177 @@ public class GameStateManager : NetworkBehaviour
     public Transform[] cellPositions; // Array of cell transforms (set in editor or at runtime)
 
     // Track player symbols by clientId
-    public Dictionary<ulong, int> playerSymbols = new Dictionary<ulong, int>();
+    public Dictionary<ulong, int> playerSymbols = new();
 
+    // Debug: Slide direction selector for editor
+    public SlideDirection debugSlideDirection = SlideDirection.Up;
+
+    // Helper: Convert (row, col) to board index
+    private int GetIndex(int row, int col)
+    {
+        return row * 3 + col;
+    }
+    // Slide the board in a direction
+    public void SlideBoard(SlideDirection direction)
+    {
+        int[] newBoard = new int[9];
+        for (int i = 0; i < 9; i++)
+            newBoard[i] = (int)PlayerSymbol.None;
+
+        lastSlideDirection = direction;
+        switch (direction)
+        {
+            case SlideDirection.Up:
+                for (int col = 0; col < 3; col++)
+                {
+                    int targetRow = 0;
+                    for (int row = 0; row < 3; row++)
+                    {
+                        int idx = GetIndex(row, col);
+                        int symbol = boardState[idx];
+                        if (symbol != (int)PlayerSymbol.None)
+                        {
+                            int targetIdx = GetIndex(targetRow, col);
+                            newBoard[targetIdx] = symbol;
+                            targetRow++;
+                        }
+                    }
+                }
+                break;
+            case SlideDirection.Down:
+                for (int col = 0; col < 3; col++)
+                {
+                    int targetRow = 2;
+                    for (int row = 2; row >= 0; row--)
+                    {
+                        int idx = GetIndex(row, col);
+                        int symbol = boardState[idx];
+                        if (symbol != (int)PlayerSymbol.None)
+                        {
+                            int targetIdx = GetIndex(targetRow, col);
+                            newBoard[targetIdx] = symbol;
+                            targetRow--;
+                        }
+                    }
+                }
+                break;
+            case SlideDirection.Left:
+                for (int row = 0; row < 3; row++)
+                {
+                    int targetCol = 0;
+                    for (int col = 0; col < 3; col++)
+                    {
+                        int idx = GetIndex(row, col);
+                        int symbol = boardState[idx];
+                        if (symbol != (int)PlayerSymbol.None)
+                        {
+                            int targetIdx = GetIndex(row, targetCol);
+                            newBoard[targetIdx] = symbol;
+                            targetCol++;
+                        }
+                    }
+                }
+                break;
+            case SlideDirection.Right:
+                for (int row = 0; row < 3; row++)
+                {
+                    int targetCol = 2;
+                    for (int col = 2; col >= 0; col--)
+                    {
+                        int idx = GetIndex(row, col);
+                        int symbol = boardState[idx];
+                        if (symbol != (int)PlayerSymbol.None)
+                        {
+                            int targetIdx = GetIndex(row, targetCol);
+                            newBoard[targetIdx] = symbol;
+                            targetCol--;
+                        }
+                    }
+                }
+                break;
+        }
+        // Update boardState
+        for (int i = 0; i < 9; i++)
+            boardState[i] = newBoard[i];
+
+        // Update piece visuals after sliding
+        UpdatePieceVisuals();
+    }
+
+    // Update piece GameObjects to match boardState
+    private void UpdatePieceVisuals()
+    {
+        // Find all piece GameObjects
+        var pieces = GameObject.FindGameObjectsWithTag("Piece");
+        // Map: cellIndex -> piece GameObject
+        Dictionary<int, GameObject> cellToPiece = new Dictionary<int, GameObject>();
+        Dictionary<int, Vector3> oldPositions = new Dictionary<int, Vector3>();
+        foreach (var piece in pieces)
+        {
+            var sync = piece.GetComponent<PieceNetworkSync>();
+            if (sync != null)
+            {
+                cellToPiece[sync.cellIndex] = piece;
+                oldPositions[sync.cellIndex] = piece.transform.position;
+            }
+        }
+        // For each cell, update or spawn/destroy as needed
+        for (int i = 0; i < 9; i++)
+        {
+            int symbol = boardState[i];
+            if (symbol == (int)PlayerSymbol.None)
+            {
+                // If a piece exists here, destroy it
+                if (cellToPiece.ContainsKey(i))
+                {
+                    var netObj = cellToPiece[i].GetComponent<NetworkObject>();
+                    if (netObj != null && netObj.IsSpawned)
+                        netObj.Despawn();
+                    else
+                        Destroy(cellToPiece[i]);
+                }
+            }
+            else
+            {
+                // Only respawn if symbol changed
+                if (cellToPiece.ContainsKey(i))
+                {
+                    var sync = cellToPiece[i].GetComponent<PieceNetworkSync>();
+                    if (sync.playerSymbol.Value != symbol)
+                    {
+                        var netObj = cellToPiece[i].GetComponent<NetworkObject>();
+                        if (netObj != null && netObj.IsSpawned)
+                            netObj.Despawn();
+                        else
+                            GameObject.Destroy(cellToPiece[i]);
+                        var newPiece = SpawnPiece(i, symbol);
+                        newPiece.transform.position = cellPositions[i].position;
+                        Debug.Log($"[Slide] Respawned piece snapped to {cellPositions[i].position} (cell {i})");
+                    }
+                    else
+                    {
+                        // Animate piece to correct position if moved
+                        Vector3 newPos = cellPositions[i].position;
+                        Vector3 oldPos = oldPositions.ContainsKey(i) ? oldPositions[i] : newPos;
+                        if ((oldPos - newPos).sqrMagnitude > 0.001f)
+                        {
+                            cellToPiece[i].transform.position = newPos;
+                            Debug.Log($"[Slide] Moving piece snapped to {newPos} (cell {i})");
+                        }
+                        sync.cellIndex = i;
+                    }
+                }
+                else
+                {
+                    // No piece exists, spawn it
+                    var newPiece = SpawnPiece(i, symbol);
+                    Debug.Log($"[Slide] New piece spawned at {cellPositions[i].position} (cell {i})");
+                    // No animation needed for new pieces (they appear at their cell)
+                }
+            }
+        }
+    }
+    
     public static GameStateManager Instance { get; private set; }
 
     private void Awake()
@@ -161,14 +341,15 @@ public class GameStateManager : NetworkBehaviour
         gameResult.Value = (int)CheckGameResult();
     }
 
-    private void SpawnPiece(int cellIndex, int playerSymbol)
+    private GameObject SpawnPiece(int cellIndex, int playerSymbol, Vector3? startPosition = null)
     {
         if (cellPositions == null || cellPositions.Length <= cellIndex) {
             Debug.LogError($"GameStateManager: cellPositions is null or index {cellIndex} out of bounds");
-            return;
+            return null;
         }
         Transform cellTransform = cellPositions[cellIndex];
-        GameObject piece = Instantiate(placeablePrefab, cellTransform.position, Quaternion.identity);
+        Vector3 spawnPos = startPosition ?? cellTransform.position;
+        GameObject piece = Instantiate(placeablePrefab, spawnPos, Quaternion.identity);
         var netObj = piece.GetComponent<NetworkObject>();
         if (netObj != null)
         {
@@ -183,11 +364,13 @@ public class GameStateManager : NetworkBehaviour
         if (pieceSync != null)
         {
             pieceSync.playerSymbol.Value = playerSymbol;
+            pieceSync.cellIndex = cellIndex;
         }
         else
         {
             Debug.LogError($"GameStateManager: No PieceNetworkSync component found on piece prefab!");
         }
+        return piece;
     }
 
     // Utility: Get board as array
@@ -227,6 +410,13 @@ public class GameStateManager : NetworkBehaviour
         currentTurn.Value = lastStartingPlayer.Value;
         gameResult.Value = (int)GameResult.Ongoing;
         
+        // Reset slide usage for all players
+        var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+        foreach (var pc in playerControllers)
+        {
+            pc.hasUsedSlide.Value = false;
+        }
+
         var pieces = GameObject.FindGameObjectsWithTag("Piece");
         foreach (var piece in pieces)
         {
@@ -234,7 +424,7 @@ public class GameStateManager : NetworkBehaviour
             if (netObj != null && netObj.IsSpawned)
                 netObj.Despawn();
             else
-                GameObject.Destroy(piece);
+                Destroy(piece);
         }
         restartRequests.Clear();
     }

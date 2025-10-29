@@ -3,6 +3,8 @@ using Unity.Netcode;
 
 public class PieceNetworkSync : NetworkBehaviour
 {
+    public int cellIndex; // Track which cell this piece is in
+
     public NetworkVariable<int> playerSymbol = new NetworkVariable<int>();
 
     public Material xMaterial;

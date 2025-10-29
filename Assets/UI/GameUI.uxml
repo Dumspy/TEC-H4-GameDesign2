@@ -3,6 +3,8 @@
     <ui:VisualElement name="VisualElement">
     <ui:VisualElement name="TurnBar">
         <ui:Label name="TurnLabel" text="Turn: X" />
+        <ui:Button name="SlideButton" text="Slide" />
+        <ui:Label name="SlideDirectionLabel" text="" style="display: none; color: orange; font-size: 18px; margin-top: 8px;" />
     </ui:VisualElement>
     <ui:VisualElement name="ResultOverlay" style="display: none;">
         <ui:Label name="ResultLabel" text="" />
