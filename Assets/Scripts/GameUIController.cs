@@ -37,50 +37,49 @@ public class GameUIController : MonoBehaviour
     void Update()
     {
         if (gameStateManager == null) return;
-        // Show/hide overlay based on game result
         bool showOverlay = gameStateManager.gameResult.Value != (int)GameResult.Ongoing;
-        resultOverlay.style.display = showOverlay ? DisplayStyle.Flex : DisplayStyle.None;
-        turnLabel.visible = !showOverlay;
-
-        // Update turn label to "Your turn" or "Opponent's turn"
-        if (!showOverlay)
-        {
-            // Find the local PlayerController and use its playerSymbol
-            if (localPlayerController != null && localPlayerController.IsSpawned)
-            {
-                int currentTurn = gameStateManager.currentTurn.Value;
-                if (localPlayerController.playerSymbol.Value == currentTurn)
-                {
-                    turnLabel.text = "Your turn";
-                }
-                else
-                {
-                    turnLabel.text = "Opponent's turn";
-                }
-            }
-            else
-            {
-                turnLabel.text = "Waiting for network...";
-            }
-        }
-
-        // Show restart progress (X/2)
+        UpdateOverlayAndTurnLabelVisibility(showOverlay);
+        
         if (showOverlay)
         {
-            int restartCount = gameStateManager.restartRequests != null ? gameStateManager.restartRequests.Count : 0;
-            restartButton.text = $"Restart ({restartCount}/2)";
-            // Enable button if not already clicked by this player
-            ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
-            bool alreadyClicked = gameStateManager.restartRequests != null && gameStateManager.restartRequests.Contains(localId);
-            restartButton.SetEnabled(!alreadyClicked);
-        }
-        else
-        {
-            restartButton.text = "Restart";
-            restartButton.SetEnabled(true);
+            UpdateResultLabel();
+            UpdateRestartButton();
+            
+            return;
         }
 
-        // Update result label and color
+        UpdateTurnLabelText();
+    }
+
+    private void UpdateOverlayAndTurnLabelVisibility(bool showOverlay)
+    {
+        resultOverlay.style.display = showOverlay ? DisplayStyle.Flex : DisplayStyle.None;
+        turnLabel.visible = !showOverlay;
+    }
+
+    private void UpdateTurnLabelText()
+    {
+        if (localPlayerController != null && localPlayerController.IsSpawned)
+        {
+            int currentTurn = gameStateManager.currentTurn.Value;
+            turnLabel.text = localPlayerController.playerSymbol.Value == currentTurn ? "Your turn" : "Opponent's turn";
+            return;
+        }   
+
+        turnLabel.text = "Waiting for network...";
+    }
+
+    private void UpdateRestartButton()
+    {
+        int restartCount = gameStateManager.restartRequests != null ? gameStateManager.restartRequests.Count : 0;
+        restartButton.text = $"Restart ({restartCount}/2)";
+        ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+        bool alreadyClicked = gameStateManager.restartRequests != null && gameStateManager.restartRequests.Contains(localId);
+        restartButton.SetEnabled(!alreadyClicked);
+    }
+
+    private void UpdateResultLabel()
+    {
         switch ((GameResult)gameStateManager.gameResult.Value)
         {
             case GameResult.XWins:
