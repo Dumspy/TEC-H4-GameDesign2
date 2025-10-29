@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/MainMenu.uss?fileID=7433441132597879392&amp;guid=2f01581beb3cb49a2ba211f6ec5fc492&amp;type=3#MainMenu" />
+    <ui:VisualElement class="main-menu-container">
+        <ui:Label text="TicTacToe" class="main-menu-title" />
+        <ui:Button name="SingleplayerButton" text="Singleplayer (vs AI)" class="main-menu-button" />
+        <ui:Button name="HostButton" text="Host Multiplayer Game" class="main-menu-button" />
+        <ui:Button name="JoinButton" text="Join Multiplayer Game" class="main-menu-button" />
+    </ui:VisualElement>
+</ui:UXML>

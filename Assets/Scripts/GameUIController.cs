@@ -8,18 +8,25 @@ public class GameUIController : MonoBehaviour
     private Label resultLabel;
     private Button restartButton;
     private VisualElement resultOverlay;
-
-    private GameStateManager gameStateManager;
     private PlayerController localPlayerController;
+    public bool playerRegistered = false;
 
     public void RegisterLocalPlayer(PlayerController pc)
     {
         localPlayerController = pc;
+        playerRegistered = true;
     }
+
+    public static GameUIController Instance { get; private set; }
 
     void Awake()
     {
-        gameStateManager = FindFirstObjectByType<GameStateManager>();
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
     }
 
     void OnEnable()
@@ -36,8 +43,8 @@ public class GameUIController : MonoBehaviour
 
     void Update()
     {
-        if (gameStateManager == null) return;
-        bool showOverlay = gameStateManager.gameResult.Value != (int)GameResult.Ongoing;
+        if (GameStateManager.Instance == null) return;
+        bool showOverlay = GameStateManager.Instance.gameResult.Value != (int)GameResult.Ongoing;
         UpdateOverlayAndTurnLabelVisibility(showOverlay);
         
         if (showOverlay)
@@ -61,7 +68,7 @@ public class GameUIController : MonoBehaviour
     {
         if (localPlayerController != null && localPlayerController.IsSpawned)
         {
-            int currentTurn = gameStateManager.currentTurn.Value;
+            int currentTurn = GameStateManager.Instance.currentTurn.Value;
             turnLabel.text = localPlayerController.playerSymbol.Value == currentTurn ? "Your turn" : "Opponent's turn";
             return;
         }   
@@ -71,16 +78,16 @@ public class GameUIController : MonoBehaviour
 
     private void UpdateRestartButton()
     {
-        int restartCount = gameStateManager.restartRequests != null ? gameStateManager.restartRequests.Count : 0;
+        int restartCount = GameStateManager.Instance.restartRequests != null ? GameStateManager.Instance.restartRequests.Count : 0;
         restartButton.text = $"Restart ({restartCount}/2)";
         ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
-        bool alreadyClicked = gameStateManager.restartRequests != null && gameStateManager.restartRequests.Contains(localId);
+        bool alreadyClicked = GameStateManager.Instance.restartRequests != null && GameStateManager.Instance.restartRequests.Contains(localId);
         restartButton.SetEnabled(!alreadyClicked);
     }
 
     private void UpdateResultLabel()
     {
-        switch ((GameResult)gameStateManager.gameResult.Value)
+        switch ((GameResult)GameStateManager.Instance.gameResult.Value)
         {
             case GameResult.XWins:
                 resultLabel.text = "X Wins!";
@@ -103,10 +110,10 @@ public class GameUIController : MonoBehaviour
 
     void OnRestartClicked()
     {
-        if (gameStateManager != null)
+        if (GameStateManager.Instance != null)
         {
             ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
-            gameStateManager.RequestRestartServerRpc(localId);
+            GameStateManager.Instance.RequestRestartServerRpc(localId);
             restartButton.SetEnabled(false); // Disable button after click
         }
     }

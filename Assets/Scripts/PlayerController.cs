@@ -3,21 +3,15 @@ using Unity.Netcode;
 
 public class PlayerController : NetworkBehaviour
 {
+    public NetworkVariable<int> playerSymbol = new((int)PlayerSymbol.None, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-    private GameStateManager gameStateManager;
-    public NetworkVariable<int> playerSymbol = new NetworkVariable<int>(
-        (int)PlayerSymbol.None, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-
-    public override void OnNetworkSpawn()
+    void Update()
     {
-        if (IsOwner)
+        if (!IsOwner) return;
+        var ui = GameUIController.Instance;
+        if (ui != null && !ui.playerRegistered)
         {
-            gameStateManager = FindFirstObjectByType<GameStateManager>();
-            var ui = FindFirstObjectByType<GameUIController>();
-            if (ui != null)
-            {
-                ui.RegisterLocalPlayer(this);
-            }
+            ui.RegisterLocalPlayer(this);
         }
     }
 
@@ -27,16 +21,23 @@ public class PlayerController : NetworkBehaviour
         {
             return;
         }
-        
-        if (gameStateManager.gameResult.Value != (int)GameResult.Ongoing)
+
+        if (GameStateManager.Instance == null)
         {
+            Debug.LogWarning("PlayerController: gameStateManager is null in TryMakeMove!");
             return;
         }
+        
+        if (GameStateManager.Instance.gameResult.Value != (int)GameResult.Ongoing)
+        {
+            return; // Game already over
+        }
 
-        if (gameStateManager.currentTurn.Value != playerSymbol.Value) {
+        if (GameStateManager.Instance.currentTurn.Value != playerSymbol.Value)
+        {
             return; // Not your turn
         }
 
-        gameStateManager.MakeMoveServerRpc(cellIndex, playerSymbol.Value);
+        GameStateManager.Instance.MakeMoveServerRpc(cellIndex, playerSymbol.Value);
     }
 }

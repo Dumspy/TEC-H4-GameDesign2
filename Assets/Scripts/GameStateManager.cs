@@ -1,5 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
+// Ensure GameModeManager is accessible
+
 using System.Collections.Generic;
 
 public enum PlayerSymbol
@@ -38,8 +40,16 @@ public class GameStateManager : NetworkBehaviour
     // Track player symbols by clientId
     private Dictionary<ulong, int> playerSymbols = new Dictionary<ulong, int>();
 
+    public static GameStateManager Instance { get; private set; }
+
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
         boardState = new NetworkList<int>();
         restartRequests = new NetworkList<ulong>();
     }
@@ -55,18 +65,30 @@ public class GameStateManager : NetworkBehaviour
                     boardState.Add((int)PlayerSymbol.None);
                 }
             }
+            // Assign host symbol if not set
+            ulong hostId = NetworkManager.Singleton.LocalClientId;
+            AssignPlayerSymbol(hostId);
         }
     }
 
     private void Start()
     {
-        if (NetworkManager.Singleton != null)
+        // Reference GameModeManager directly (global static class)
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
         {
-            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+            Debug.Log("GameStateManager: Singleplayer mode selected. AI should be enabled.");
+            // TODO: Add AI logic here
         }
         else
         {
-            Debug.LogError("GameStateManager: NetworkManager.Singleton is null in Start!");
+            if (NetworkManager.Singleton != null)
+            {
+                NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+            }
+            else
+            {
+                Debug.LogError("GameStateManager: NetworkManager.Singleton is null in Start!");
+            }
         }
 
         // Defensive checks
@@ -91,7 +113,11 @@ public class GameStateManager : NetworkBehaviour
     private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
-        
+        AssignPlayerSymbol(clientId);
+    }
+
+    private void AssignPlayerSymbol(ulong clientId)
+    {
         if (!playerSymbols.ContainsKey(clientId))
         {
             int symbol = playerSymbols.Count == 0 ? (int)PlayerSymbol.X : (int)PlayerSymbol.O;
@@ -106,23 +132,6 @@ public class GameStateManager : NetworkBehaviour
                 }
             }
         }
-    }
-
-
-
-    public int GetLocalPlayerSymbol()
-    {
-        ulong localId = NetworkManager.Singleton.LocalClientId;
-        // Use NetworkVariable on PlayerController for local symbol
-        var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
-        foreach (var pc in playerControllers)
-        {
-            if (pc.IsOwner)
-            {
-                return pc.playerSymbol.Value;
-            }
-        }
-        return (int)PlayerSymbol.None;
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -173,8 +182,6 @@ public class GameStateManager : NetworkBehaviour
         var pieceSync = piece.GetComponent<PieceNetworkSync>();
         if (pieceSync != null)
         {
-            pieceSync.xMaterial = xMaterial;
-            pieceSync.oMaterial = oMaterial;
             pieceSync.playerSymbol.Value = playerSymbol;
         }
         else
