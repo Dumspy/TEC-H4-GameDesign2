@@ -3,8 +3,8 @@
     height: 100%;
     --main-color: rgb(34, 34, 34);
     --accent-color: rgb(76, 175, 80);
-    --win-color-x: rgb(33, 150, 243); /* blue for X */
-    --win-color-o: rgb(220, 20, 60); /* red for O */
+    --win-color-x: rgb(33, 150, 243);
+    --win-color-o: rgb(220, 20, 60);
     --draw-color: rgb(255, 193, 7);
     --font-size-large: 32px;
     --font-size-medium: 24px;
@@ -39,7 +39,7 @@ VisualElement {
 #TurnLabel {
     font-size: var(--font-size-large);
     color: var(--main-color);
-    margin-bottom: 20px;
+    margin-bottom: 0;
     -unity-font-style: bold;
 }
 
