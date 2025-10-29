@@ -19,6 +19,10 @@ public enum GameResult
 
 public class GameStateManager : NetworkBehaviour
 {
+    // Track which players have requested a restart
+    public NetworkList<ulong> restartRequests;
+    // Track who started last game (X or O)
+    public NetworkVariable<int> lastStartingPlayer = new NetworkVariable<int>((int)PlayerSymbol.X);
     public NetworkList<int> boardState;
     public NetworkVariable<int> currentTurn = new NetworkVariable<int>((int)PlayerSymbol.X);
     public NetworkVariable<int> gameResult = new NetworkVariable<int>((int)GameResult.Ongoing);
@@ -31,13 +35,13 @@ public class GameStateManager : NetworkBehaviour
     // You may want to set these in the Inspector
     public Transform[] cellPositions; // Array of cell transforms (set in editor or at runtime)
 
-
     // Track player symbols by clientId
     private Dictionary<ulong, int> playerSymbols = new Dictionary<ulong, int>();
 
     private void Awake()
     {
         boardState = new NetworkList<int>();
+        restartRequests = new NetworkList<ulong>();
     }
 
     public override void OnNetworkSpawn()
@@ -52,14 +56,7 @@ public class GameStateManager : NetworkBehaviour
                 }
             }
         }
-        gameResult.OnValueChanged += OnGameResultChanged;
     }
-
-    private void OnGameResultChanged(int oldValue, int newValue)
-    {
-        // TODO: Trigger UI updates here
-    }
-
 
     private void Start()
     {
@@ -71,8 +68,6 @@ public class GameStateManager : NetworkBehaviour
         {
             Debug.LogError("GameStateManager: NetworkManager.Singleton is null in Start!");
         }
-
-        // NetworkManager.Singleton access moved to Start()
 
         // Defensive checks
         if (placeablePrefab == null)
@@ -96,37 +91,40 @@ public class GameStateManager : NetworkBehaviour
     private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
-        // Assign X to first, O to second
+        
         if (!playerSymbols.ContainsKey(clientId))
         {
             int symbol = playerSymbols.Count == 0 ? (int)PlayerSymbol.X : (int)PlayerSymbol.O;
             playerSymbols[clientId] = symbol;
-            AssignPlayerSymbolClientRpc(symbol, clientId);
-        }
-    }
-
-    [ClientRpc]
-    private void AssignPlayerSymbolClientRpc(int symbol, ulong clientId)
-    {
-        var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
-        foreach (var pc in playerControllers)
-        {
-            if (pc.OwnerClientId == clientId)
+            var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+            foreach (var pc in playerControllers)
             {
-                pc.SetPlayerSymbol(symbol);
+                if (pc.OwnerClientId == clientId)
+                {
+                    pc.playerSymbol.Value = symbol;
+                    break;
+                }
             }
         }
     }
 
+
+
     public int GetLocalPlayerSymbol()
     {
         ulong localId = NetworkManager.Singleton.LocalClientId;
-        if (playerSymbols.TryGetValue(localId, out int symbol))
-            return symbol;
+        // Use NetworkVariable on PlayerController for local symbol
+        var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+        foreach (var pc in playerControllers)
+        {
+            if (pc.IsOwner)
+            {
+                return pc.playerSymbol.Value;
+            }
+        }
         return (int)PlayerSymbol.None;
     }
 
-    // Call this to make a move
     [ServerRpc(RequireOwnership = false)]
     public void MakeMoveServerRpc(int cellIndex, int playerSymbol)
     {
@@ -198,24 +196,40 @@ public class GameStateManager : NetworkBehaviour
 
     // Game reset logic
     [ServerRpc(RequireOwnership = false)]
-    public void ResetGameServerRpc()
+    public void RequestRestartServerRpc(ulong clientId)
+    {
+        if (!restartRequests.Contains(clientId))
+        {
+            restartRequests.Add(clientId);
+        }
+        // Only restart if both players have requested
+        if (restartRequests.Count >= 2)
+        {
+            ResetGameInternal();
+        }
+    }
+
+    private void ResetGameInternal()
     {
         for (int i = 0; i < boardState.Count; i++)
         {
             boardState[i] = (int)PlayerSymbol.None;
         }
-        currentTurn.Value = (int)PlayerSymbol.X;
+        // Alternate starting player
+        lastStartingPlayer.Value = (lastStartingPlayer.Value == (int)PlayerSymbol.X) ? (int)PlayerSymbol.O : (int)PlayerSymbol.X;
+        currentTurn.Value = lastStartingPlayer.Value;
         gameResult.Value = (int)GameResult.Ongoing;
-        // Optionally: Destroy all pieces in scene
+        
         var pieces = GameObject.FindGameObjectsWithTag("Piece");
         foreach (var piece in pieces)
         {
-            var netObj = piece.GetComponent<Unity.Netcode.NetworkObject>();
+            var netObj = piece.GetComponent<NetworkObject>();
             if (netObj != null && netObj.IsSpawned)
                 netObj.Despawn();
             else
                 GameObject.Destroy(piece);
         }
+        restartRequests.Clear();
     }
 
     // Win/draw detection

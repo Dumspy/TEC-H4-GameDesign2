@@ -10,6 +10,12 @@ public class GameUIController : MonoBehaviour
     private VisualElement resultOverlay;
 
     private GameStateManager gameStateManager;
+    private PlayerController localPlayerController;
+
+    public void RegisterLocalPlayer(PlayerController pc)
+    {
+        localPlayerController = pc;
+    }
 
     void Awake()
     {
@@ -25,6 +31,7 @@ public class GameUIController : MonoBehaviour
         restartButton = root.Q<Button>("RestartButton");
         resultOverlay = root.Q<VisualElement>("ResultOverlay");
         restartButton.clicked += OnRestartClicked;
+        restartButton.text = "Restart";
     }
 
     void Update()
@@ -34,6 +41,44 @@ public class GameUIController : MonoBehaviour
         bool showOverlay = gameStateManager.gameResult.Value != (int)GameResult.Ongoing;
         resultOverlay.style.display = showOverlay ? DisplayStyle.Flex : DisplayStyle.None;
         turnLabel.visible = !showOverlay;
+
+        // Update turn label to "Your turn" or "Opponent's turn"
+        if (!showOverlay)
+        {
+            // Find the local PlayerController and use its playerSymbol
+            if (localPlayerController != null && localPlayerController.IsSpawned)
+            {
+                int currentTurn = gameStateManager.currentTurn.Value;
+                if (localPlayerController.playerSymbol.Value == currentTurn)
+                {
+                    turnLabel.text = "Your turn";
+                }
+                else
+                {
+                    turnLabel.text = "Opponent's turn";
+                }
+            }
+            else
+            {
+                turnLabel.text = "Waiting for network...";
+            }
+        }
+
+        // Show restart progress (X/2)
+        if (showOverlay)
+        {
+            int restartCount = gameStateManager.restartRequests != null ? gameStateManager.restartRequests.Count : 0;
+            restartButton.text = $"Restart ({restartCount}/2)";
+            // Enable button if not already clicked by this player
+            ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+            bool alreadyClicked = gameStateManager.restartRequests != null && gameStateManager.restartRequests.Contains(localId);
+            restartButton.SetEnabled(!alreadyClicked);
+        }
+        else
+        {
+            restartButton.text = "Restart";
+            restartButton.SetEnabled(true);
+        }
 
         // Update result label and color
         switch ((GameResult)gameStateManager.gameResult.Value)
@@ -59,14 +104,11 @@ public class GameUIController : MonoBehaviour
 
     void OnRestartClicked()
     {
-        if (gameStateManager != null && gameStateManager.IsServer)
+        if (gameStateManager != null)
         {
-            gameStateManager.ResetGameServerRpc();
-        }
-        else if (gameStateManager != null)
-        {
-            // If client, request server to reset
-            gameStateManager.ResetGameServerRpc();
+            ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+            gameStateManager.RequestRestartServerRpc(localId);
+            restartButton.SetEnabled(false); // Disable button after click
         }
     }
 }
