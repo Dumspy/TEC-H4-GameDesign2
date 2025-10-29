@@ -66,14 +66,21 @@ public class GameUIController : MonoBehaviour
 
     private void UpdateTurnLabelText()
     {
+        // Show 'Waiting for opponent...' if only one player is present
+        if (GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 1)
+        {
+            turnLabel.text = "Waiting for opponent...";
+            return;
+        }
+        
         if (localPlayerController != null && localPlayerController.IsSpawned)
         {
             int currentTurn = GameStateManager.Instance.currentTurn.Value;
             turnLabel.text = localPlayerController.playerSymbol.Value == currentTurn ? "Your turn" : "Opponent's turn";
             return;
-        }   
-
-        turnLabel.text = "Waiting for network...";
+        }
+        
+        turnLabel.text = "";
     }
 
     private void UpdateRestartButton()

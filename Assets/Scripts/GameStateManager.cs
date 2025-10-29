@@ -38,7 +38,7 @@ public class GameStateManager : NetworkBehaviour
     public Transform[] cellPositions; // Array of cell transforms (set in editor or at runtime)
 
     // Track player symbols by clientId
-    private Dictionary<ulong, int> playerSymbols = new Dictionary<ulong, int>();
+    public Dictionary<ulong, int> playerSymbols = new Dictionary<ulong, int>();
 
     public static GameStateManager Instance { get; private set; }
 
@@ -116,7 +116,7 @@ public class GameStateManager : NetworkBehaviour
         AssignPlayerSymbol(clientId);
     }
 
-    private void AssignPlayerSymbol(ulong clientId)
+    public void AssignPlayerSymbol(ulong clientId)
     {
         if (!playerSymbols.ContainsKey(clientId))
         {
@@ -125,7 +125,7 @@ public class GameStateManager : NetworkBehaviour
             var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
             foreach (var pc in playerControllers)
             {
-                if (pc.OwnerClientId == clientId)
+                if (pc.OwnerClientId == clientId && pc.IsSpawned)
                 {
                     pc.playerSymbol.Value = symbol;
                     break;
