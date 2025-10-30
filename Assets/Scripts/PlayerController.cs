@@ -8,7 +8,6 @@ public class PlayerController : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        Debug.Log($"PlayerController OnNetworkSpawn: clientId={NetworkManager.Singleton.LocalClientId}, OwnerClientId={OwnerClientId}, playerSymbol={playerSymbol.Value}");
         if (IsOwner && GameUIController.Instance != null)
         {
             GameUIController.Instance.RegisterLocalPlayer(this);
@@ -31,33 +30,26 @@ public class PlayerController : NetworkBehaviour
     private bool CanAct(bool checkTurn = true, bool checkSlide = false)
     {
         if (!IsOwner) {
-            Debug.Log("CanAct: Not owner");
             return false;
         }
         if (GameStateManager.Instance == null) {
-            Debug.Log("CanAct: GameStateManager.Instance is null");
             return false;
         }
         // In multiplayer, require 2 players to act (host only)
         if (GameModeManager.SelectedMode != GameModeManager.GameMode.Singleplayer) {
             if (NetworkManager.Singleton.IsHost && GameStateManager.Instance.playerSymbols.Count != 2) {
-                Debug.Log($"CanAct: Not enough players (playerSymbols.Count={GameStateManager.Instance.playerSymbols.Count})");
                 return false;
             }
         }
         if (GameStateManager.Instance.gameResult.Value != (int)GameResult.Ongoing) {
-            Debug.Log($"CanAct: Game is not ongoing (gameResult={GameStateManager.Instance.gameResult.Value})");
             return false;
         }
         if (checkTurn && GameStateManager.Instance.currentTurn.Value != playerSymbol.Value) {
-            Debug.Log($"CanAct: Not your turn (currentTurn={GameStateManager.Instance.currentTurn.Value}, playerSymbol={playerSymbol.Value})");
             return false;
         }
         if (checkSlide && hasUsedSlide.Value) {
-            Debug.Log("CanAct: Already used slide");
             return false;
         }
-        Debug.Log($"CanAct: Allowed (currentTurn={GameStateManager.Instance.currentTurn.Value}, playerSymbol={playerSymbol.Value})");
         return true;
     }
 
@@ -66,10 +58,8 @@ public class PlayerController : NetworkBehaviour
     public void TryMakeMove(int cellIndex)
     {
         if (!CanAct(checkTurn: true)) {
-            Debug.Log($"TryMakeMove: Blocked move for cell {cellIndex}, playerSymbol={playerSymbol.Value}");
             return;
         }
-        Debug.Log($"TryMakeMove: Attempting move for cell {cellIndex}, playerSymbol={playerSymbol.Value}");
         GameStateManager.Instance.MakeMoveServerRpc(cellIndex, playerSymbol.Value);
     }
 

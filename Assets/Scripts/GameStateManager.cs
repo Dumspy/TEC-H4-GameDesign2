@@ -55,6 +55,16 @@ public class GameStateManager : NetworkBehaviour
             }
         }
         SlideBoard(direction);
+        
+
+        // After sliding, if singleplayer and it's AI's turn, trigger AI move
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer &&
+            currentTurn.Value == aiSymbol &&
+            gameResult.Value == (int)GameResult.Ongoing)
+        {
+            
+            StartCoroutine(AIMoveDelayCoroutine());
+        }
     }
 
     private bool CanSlide(int playerSymbol)
@@ -71,7 +81,16 @@ public class GameStateManager : NetworkBehaviour
             if (!playerSymbols.ContainsValue(playerSymbol)) return false;
         }
 
-        if (slideUsedBySymbol.ContainsKey(playerSymbol) && slideUsedBySymbol[playerSymbol]) return false;
+        if (slideUsedBySymbol.ContainsKey(playerSymbol)) {
+            if (slideUsedBySymbol[playerSymbol]) {
+                
+                return false;
+            } else {
+                
+                return true;
+            }
+        }
+        
         return true;
     }
 
@@ -124,12 +143,11 @@ public class GameStateManager : NetworkBehaviour
         // Reference GameModeManager directly (global static class)
         if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
         {
-            Debug.Log("GameStateManager: Singleplayer mode selected. AI should be enabled.");
             // Assign symbols: Human is X, AI is O
             humanSymbol = (int)PlayerSymbol.X;
             aiSymbol = (int)PlayerSymbol.O;
             currentTurn.Value = humanSymbol;
-            aiLogic = new BasicRandomAI();
+            aiLogic = new UtilityBasedAI();
             // Register local player with UI if available
             var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
             foreach (var pc in playerControllers)
@@ -185,26 +203,21 @@ public class GameStateManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void MakeMoveServerRpc(int cellIndex, int playerSymbol)
     {
-        Debug.Log($"MakeMoveServerRpc: Received move cellIndex={cellIndex}, playerSymbol={playerSymbol}");
         if (!IsValidMove(cellIndex, playerSymbol)) {
-            Debug.Log($"MakeMoveServerRpc: Invalid move cellIndex={cellIndex}, playerSymbol={playerSymbol}");
             return;
         }
         if (!BoardManager.MakeMove(boardState, cellIndex, playerSymbol)) {
-            Debug.Log($"MakeMoveServerRpc: BoardManager rejected move cellIndex={cellIndex}, playerSymbol={playerSymbol}");
             return;
         }
         currentTurn.Value = (playerSymbol == (int)PlayerSymbol.X) ? (int)PlayerSymbol.O : (int)PlayerSymbol.X;
         SpawnPiece(cellIndex, playerSymbol);
         gameResult.Value = (int)BoardManager.CheckGameResult(boardState);
-        Debug.Log($"MakeMoveServerRpc: Move processed, new currentTurn={currentTurn.Value}, gameResult={gameResult.Value}");
 
         // Singleplayer: If it's now the AI's turn and game is ongoing, trigger AI logic
         if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer &&
             currentTurn.Value == aiSymbol &&
             gameResult.Value == (int)GameResult.Ongoing)
         {
-            Debug.Log("MakeMoveServerRpc: Triggering AI turn");
             StartCoroutine(AIMoveDelayCoroutine());
         }
     }
@@ -225,16 +238,13 @@ public class GameStateManager : NetworkBehaviour
         if (gameResult.Value != (int)GameResult.Ongoing || currentTurn.Value != aiSymbol)
             return;
 
-        aiLogic ??= new BasicRandomAI();
+        aiLogic ??= new UtilityBasedAI();
 
         List<int> boardCopy = new(boardState.Count);
         for (int i = 0; i < boardState.Count; i++)
             boardCopy.Add(boardState[i]);
 
-        // If AI hasn't used slide, and wants to slide, do so
-        var aiPlayerController = FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
-            .FirstOrDefault(pc => pc.playerSymbol.Value == aiSymbol);
-        bool canSlide = aiPlayerController != null && !aiPlayerController.hasUsedSlide.Value && CanSlide(aiSymbol);
+        bool canSlide = CanSlide(aiSymbol);
         if (canSlide && aiLogic.ShouldSlide(boardCopy, aiSymbol, humanSymbol))
         {
             SlideDirection direction = aiLogic.ChooseSlideDirection(boardCopy, aiSymbol, humanSymbol);
@@ -331,7 +341,4 @@ public class GameStateManager : NetworkBehaviour
     {
         restartRequests.Clear();
     }
-
-    // Moved to PlayerManager.cs
-
 }

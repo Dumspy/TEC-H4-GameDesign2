@@ -331,13 +331,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.27059805, y: -0.6532815, z: 0.27059805, w: 0.6532815}
-  m_LocalPosition: {x: 29, y: 29, z: -0.0000013113021}
+  m_LocalRotation: {x: 0.38268343, y: 0, z: 0, w: 0.92387956}
+  m_LocalPosition: {x: 0, y: 28, z: -28}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 45, y: -90, z: 0}
+  m_LocalEulerAnglesHint: {x: 45, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -880,7 +880,6 @@ MonoBehaviour:
     m_InternalValue: 0
   lastSlideDirection: 0
   placeablePrefab: {fileID: 3950819205851592405, guid: 2322502d8c4b0c94f8d95645b4dad988, type: 3}
-  playerControllerPrefab: {fileID: 7869488768708615252, guid: 0d7b1ed56c51adf468669a37a59f2894, type: 3}
   xMaterial: {fileID: 2100000, guid: c4fd6ad872dfc5243981fc3106e789e0, type: 2}
   oMaterial: {fileID: 2100000, guid: 79f5811127a597c43ba99fe0763bdcd0, type: 2}
   cellPositions:

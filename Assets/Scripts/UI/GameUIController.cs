@@ -114,7 +114,7 @@ public class GameUIController : MonoBehaviour
         }
         else
         {
-            bool bothPlayersPresent = GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 2;
+            bool bothPlayersPresent = !NetworkManager.Singleton.IsHost || GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 2;
             canSlide = bothPlayersPresent && !localPlayerController.hasUsedSlide.Value && GameStateManager.Instance.gameResult.Value == (int)GameResult.Ongoing;
             buttonManager.UpdateSlideButton(bothPlayersPresent, canSlide);
         }
@@ -155,7 +155,6 @@ public class GameUIController : MonoBehaviour
         if (localPlayerController != null && localPlayerController.IsSpawned)
         {
             int currentTurn = GameStateManager.Instance.currentTurn.Value;
-            Debug.Log($"UpdateTurnLabelText: localPlayerController.playerSymbol.Value={localPlayerController.playerSymbol.Value}, currentTurn={currentTurn}");
             turnLabel.text = localPlayerController.playerSymbol.Value == currentTurn ? "Your turn" : "Opponent's turn";
             return;
         }

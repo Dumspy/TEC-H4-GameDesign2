@@ -45,7 +45,6 @@ public static class PieceManager
                             Object.Destroy(cellToPiece[i]);
                         var newPiece = SpawnPiece(i, symbol, cellPositions, placeablePrefab);
                         newPiece.transform.position = cellPositions[i].position;
-                        Debug.Log($"[Slide] Respawned piece snapped to {cellPositions[i].position} (cell {i})");
                     }
                     else
                     {
@@ -54,7 +53,6 @@ public static class PieceManager
                         if ((oldPos - newPos).sqrMagnitude > 0.001f)
                         {
                             cellToPiece[i].transform.position = newPos;
-                            Debug.Log($"[Slide] Moving piece snapped to {newPos} (cell {i})");
                         }
                         sync.cellIndex = i;
                     }
@@ -62,7 +60,6 @@ public static class PieceManager
                 else
                 {
                     var newPiece = SpawnPiece(i, symbol, cellPositions, placeablePrefab);
-                    Debug.Log($"[Slide] New piece spawned at {cellPositions[i].position} (cell {i})");
                 }
             }
         }
