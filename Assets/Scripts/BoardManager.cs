@@ -131,4 +131,26 @@ public static class BoardManager
         if (allFilled) return GameResult.Draw;
         return GameResult.Ongoing;
     }
+
+    public static void ResetBoard(NetworkList<int> boardState)
+    {
+        for (int i = 0; i < boardState.Count; i++)
+        {
+            boardState[i] = (int)PlayerSymbol.None;
+        }
+    }
+
+    public static bool MakeMove(NetworkList<int> boardState, int cellIndex, int playerSymbol)
+    {
+        if (cellIndex < 0 || cellIndex >= boardState.Count)
+        {
+            return false;
+        }
+        if (boardState[cellIndex] != (int)PlayerSymbol.None)
+        {
+            return false; // Cell already occupied
+        }
+        boardState[cellIndex] = playerSymbol;
+        return true;
+    }
 }

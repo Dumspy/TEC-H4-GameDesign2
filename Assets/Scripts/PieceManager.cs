@@ -99,4 +99,17 @@ public static class PieceManager
         }
         return piece;
     }
+
+    public static void ClearAllPieces()
+    {
+        var pieces = GameObject.FindGameObjectsWithTag("Piece");
+        foreach (var piece in pieces)
+        {
+            var netObj = piece.GetComponent<NetworkObject>();
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn();
+            else
+                Object.Destroy(piece);
+        }
+    }
 }

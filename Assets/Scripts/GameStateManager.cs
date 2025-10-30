@@ -42,11 +42,8 @@ public class GameStateManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void SlideBoardServerRpc(SlideDirection direction, int playerSymbol)
     {
-        if (gameResult.Value != (int)GameResult.Ongoing) return;
-        if (!playerSymbols.ContainsValue(playerSymbol)) return;
-        if (slideUsedBySymbol.ContainsKey(playerSymbol) && slideUsedBySymbol[playerSymbol]) return;
+        if (!CanSlide(playerSymbol)) return;
         slideUsedBySymbol[playerSymbol] = true;
-        // Update PlayerController.hasUsedSlide.Value for the correct player
         var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
         foreach (var pc in playerControllers)
         {
@@ -59,13 +56,21 @@ public class GameStateManager : NetworkBehaviour
         SlideBoard(direction);
     }
 
+    private bool CanSlide(int playerSymbol)
+    {
+        if (gameResult.Value != (int)GameResult.Ongoing) return false;
+        if (!playerSymbols.ContainsValue(playerSymbol)) return false;
+        if (slideUsedBySymbol.ContainsKey(playerSymbol) && slideUsedBySymbol[playerSymbol]) return false;
+        return true;
+    }
+
+
+    public event System.Action<SlideDirection> OnSlideDirectionChanged;
+
     [ClientRpc]
     private void ShowSlideDirectionClientRpc(SlideDirection direction)
     {
-        if (GameUIController.Instance != null)
-        {
-            GameUIController.Instance.ShowSlideDirection(direction);
-        }
+        OnSlideDirectionChanged?.Invoke(direction);
     }
     
     public static GameStateManager Instance { get; private set; }
@@ -95,7 +100,7 @@ public class GameStateManager : NetworkBehaviour
             }
             // Assign host symbol if not set
             ulong hostId = NetworkManager.Singleton.LocalClientId;
-            AssignPlayerSymbol(playerSymbols, hostId);
+            PlayerManager.AssignPlayerSymbol(playerSymbols, hostId);
         }
     }
 
@@ -141,7 +146,7 @@ public class GameStateManager : NetworkBehaviour
     private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
-        AssignPlayerSymbol(playerSymbols, clientId);
+        PlayerManager.AssignPlayerSymbol(playerSymbols, clientId);
     }
 
 
@@ -149,29 +154,26 @@ public class GameStateManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void MakeMoveServerRpc(int cellIndex, int playerSymbol)
     {
-        if (gameResult.Value != (int)GameResult.Ongoing) {
+        if (!IsValidMove(cellIndex, playerSymbol)) {
             return;
         }
-        if (cellIndex < 0 || cellIndex >= boardState.Count) {
-            Debug.LogError($"GameStateManager: Invalid cellIndex {cellIndex}");
+        if (!BoardManager.MakeMove(boardState, cellIndex, playerSymbol)) {
             return;
         }
-        if (boardState[cellIndex] != (int)PlayerSymbol.None) {
-            return; // Cell already occupied
-        }
-        if (playerSymbol != currentTurn.Value) {
-            return; // Not player's turn
-        }
-
-        boardState[cellIndex] = playerSymbol;
         currentTurn.Value = (playerSymbol == (int)PlayerSymbol.X) ? (int)PlayerSymbol.O : (int)PlayerSymbol.X;
-
-        // Networked instantiation of the placeable prefab
         SpawnPiece(cellIndex, playerSymbol);
-
-        // Win/draw detection
         gameResult.Value = (int)BoardManager.CheckGameResult(boardState);
     }
+
+    private bool IsValidMove(int cellIndex, int playerSymbol)
+    {
+        if (gameResult.Value != (int)GameResult.Ongoing) return false;
+        if (cellIndex < 0 || cellIndex >= boardState.Count) return false;
+        if (boardState[cellIndex] != (int)PlayerSymbol.None) return false;
+        if (playerSymbol != currentTurn.Value) return false;
+        return true;
+    }
+
 
     private GameObject SpawnPiece(int cellIndex, int playerSymbol, Vector3? startPosition = null)
     {
@@ -195,49 +197,45 @@ public class GameStateManager : NetworkBehaviour
 
     private void ResetGameInternal()
     {
-        for (int i = 0; i < boardState.Count; i++)
-        {
-            boardState[i] = (int)PlayerSymbol.None;
-        }
+        ResetBoard();
+        ResetPlayers();
+        ResetSlideUsage();
+        ClearPieces();
+        ClearRestartRequests();
+    }
+
+    private void ResetBoard()
+    {
+        BoardManager.ResetBoard(boardState);
+        gameResult.Value = (int)GameResult.Ongoing;
+    }
+
+    private void ResetPlayers()
+    {
         // Alternate starting player
         lastStartingPlayer.Value = (lastStartingPlayer.Value == (int)PlayerSymbol.X) ? (int)PlayerSymbol.O : (int)PlayerSymbol.X;
         currentTurn.Value = lastStartingPlayer.Value;
-        gameResult.Value = (int)GameResult.Ongoing;
-        
-        // Reset slide usage for all players
+    }
+
+    private void ResetSlideUsage()
+    {
         var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
         foreach (var pc in playerControllers)
         {
             pc.hasUsedSlide.Value = false;
         }
+    }
 
-        var pieces = GameObject.FindGameObjectsWithTag("Piece");
-        foreach (var piece in pieces)
-        {
-            var netObj = piece.GetComponent<NetworkObject>();
-            if (netObj != null && netObj.IsSpawned)
-                netObj.Despawn();
-            else
-                Destroy(piece);
-        }
+    private void ClearPieces()
+    {
+        PieceManager.ClearAllPieces();
+    }
+
+    private void ClearRestartRequests()
+    {
         restartRequests.Clear();
     }
 
-    public static void AssignPlayerSymbol(Dictionary<ulong, int> playerSymbols, ulong clientId)
-    {
-        if (!playerSymbols.ContainsKey(clientId))
-        {
-            int symbol = playerSymbols.Count == 0 ? (int)PlayerSymbol.X : (int)PlayerSymbol.O;
-            playerSymbols[clientId] = symbol;
-            var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
-            foreach (var pc in playerControllers)
-            {
-                if (pc.OwnerClientId == clientId && pc.IsSpawned)
-                {
-                    pc.playerSymbol.Value = symbol;
-                    break;
-                }
-            }
-        }
-    }
+    // Moved to PlayerManager.cs
+
 }

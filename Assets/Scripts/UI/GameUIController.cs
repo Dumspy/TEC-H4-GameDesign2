@@ -34,6 +34,17 @@ public class GameUIController : MonoBehaviour
             return;
         }
         Instance = this;
+        TrySubscribeToSlideDirectionEvent();
+    }
+
+    private bool slideDirectionSubscribed = false;
+    private void TrySubscribeToSlideDirectionEvent()
+    {
+        if (!slideDirectionSubscribed && GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.OnSlideDirectionChanged += ShowSlideDirection;
+            slideDirectionSubscribed = true;
+        }
     }
 
     void OnEnable()
@@ -54,10 +65,23 @@ public class GameUIController : MonoBehaviour
         slideDirectionUIManager = new SlideDirectionUIManager(slideDirectionLabel);
         resultOverlayManager = new ResultOverlayManager(resultOverlay, resultLabel);
         buttonManager = new GameUIButtonManager(restartButton, slideButton);
+
+        // Subscribe to slide direction event
+        TrySubscribeToSlideDirectionEvent();
+    }
+
+    void OnDisable()
+    {
+        if (GameStateManager.Instance != null && slideDirectionSubscribed)
+        {
+            GameStateManager.Instance.OnSlideDirectionChanged -= ShowSlideDirection;
+            slideDirectionSubscribed = false;
+        }
     }
 
     void Update()
     {
+        TrySubscribeToSlideDirectionEvent();
         if (GameStateManager.Instance == null) return;
         bool showOverlay = GameStateManager.Instance.gameResult.Value != (int)GameResult.Ongoing;
         UpdateOverlayAndTurnLabelVisibility(showOverlay);
