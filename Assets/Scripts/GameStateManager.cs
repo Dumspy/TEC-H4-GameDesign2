@@ -27,12 +27,36 @@ public class GameStateManager : NetworkBehaviour
     // Track player symbols by clientId
     public Dictionary<ulong, int> playerSymbols = new();
 
+    // Track slide usage per player
+    private Dictionary<int, bool> slideUsedBySymbol = new();
+
     public void SlideBoard(SlideDirection direction)
     {
         BoardManager.SlideBoard(boardState, direction);
         lastSlideDirection = direction;
         PieceManager.UpdatePieceVisuals(boardState, cellPositions, placeablePrefab);
         ShowSlideDirectionClientRpc(direction);
+    }
+
+    // ServerRpc for sliding the board, matching move handling
+    [ServerRpc(RequireOwnership = false)]
+    public void SlideBoardServerRpc(SlideDirection direction, int playerSymbol)
+    {
+        if (gameResult.Value != (int)GameResult.Ongoing) return;
+        if (!playerSymbols.ContainsValue(playerSymbol)) return;
+        if (slideUsedBySymbol.ContainsKey(playerSymbol) && slideUsedBySymbol[playerSymbol]) return;
+        slideUsedBySymbol[playerSymbol] = true;
+        // Update PlayerController.hasUsedSlide.Value for the correct player
+        var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+        foreach (var pc in playerControllers)
+        {
+            if (pc.playerSymbol.Value == playerSymbol)
+            {
+                pc.hasUsedSlide.Value = true;
+                break;
+            }
+        }
+        SlideBoard(direction);
     }
 
     [ClientRpc]
