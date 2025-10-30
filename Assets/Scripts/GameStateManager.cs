@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
+using System.Linq;
 
 
 public class GameStateManager : NetworkBehaviour
@@ -59,7 +60,17 @@ public class GameStateManager : NetworkBehaviour
     private bool CanSlide(int playerSymbol)
     {
         if (gameResult.Value != (int)GameResult.Ongoing) return false;
-        if (!playerSymbols.ContainsValue(playerSymbol)) return false;
+
+        // In singleplayer, allow slide for human and AI symbols
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
+        {
+            if (playerSymbol != humanSymbol && playerSymbol != aiSymbol) return false;
+        }
+        else
+        {
+            if (!playerSymbols.ContainsValue(playerSymbol)) return false;
+        }
+
         if (slideUsedBySymbol.ContainsKey(playerSymbol) && slideUsedBySymbol[playerSymbol]) return false;
         return true;
     }
@@ -104,13 +115,33 @@ public class GameStateManager : NetworkBehaviour
         }
     }
 
+    // AI symbol for singleplayer mode
+    private int aiSymbol = (int)PlayerSymbol.None;
+    private int humanSymbol = (int)PlayerSymbol.None;
+
     private void Start()
     {
         // Reference GameModeManager directly (global static class)
         if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
         {
             Debug.Log("GameStateManager: Singleplayer mode selected. AI should be enabled.");
-            // TODO: Add AI logic here
+            // Assign symbols: Human is X, AI is O
+            humanSymbol = (int)PlayerSymbol.X;
+            aiSymbol = (int)PlayerSymbol.O;
+            currentTurn.Value = humanSymbol;
+            aiLogic = new BasicRandomAI();
+            // Register local player with UI if available
+            var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+            foreach (var pc in playerControllers)
+            {
+                if (pc.IsOwner)
+                {
+                    pc.playerSymbol.Value = humanSymbol;
+                    if (GameUIController.Instance != null)
+                        GameUIController.Instance.RegisterLocalPlayer(pc);
+                    break;
+                }
+            }
         }
         else
         {
@@ -154,15 +185,67 @@ public class GameStateManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void MakeMoveServerRpc(int cellIndex, int playerSymbol)
     {
+        Debug.Log($"MakeMoveServerRpc: Received move cellIndex={cellIndex}, playerSymbol={playerSymbol}");
         if (!IsValidMove(cellIndex, playerSymbol)) {
+            Debug.Log($"MakeMoveServerRpc: Invalid move cellIndex={cellIndex}, playerSymbol={playerSymbol}");
             return;
         }
         if (!BoardManager.MakeMove(boardState, cellIndex, playerSymbol)) {
+            Debug.Log($"MakeMoveServerRpc: BoardManager rejected move cellIndex={cellIndex}, playerSymbol={playerSymbol}");
             return;
         }
         currentTurn.Value = (playerSymbol == (int)PlayerSymbol.X) ? (int)PlayerSymbol.O : (int)PlayerSymbol.X;
         SpawnPiece(cellIndex, playerSymbol);
         gameResult.Value = (int)BoardManager.CheckGameResult(boardState);
+        Debug.Log($"MakeMoveServerRpc: Move processed, new currentTurn={currentTurn.Value}, gameResult={gameResult.Value}");
+
+        // Singleplayer: If it's now the AI's turn and game is ongoing, trigger AI logic
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer &&
+            currentTurn.Value == aiSymbol &&
+            gameResult.Value == (int)GameResult.Ongoing)
+        {
+            Debug.Log("MakeMoveServerRpc: Triggering AI turn");
+            StartCoroutine(AIMoveDelayCoroutine());
+        }
+    }
+
+    // Coroutine for AI move delay
+    private System.Collections.IEnumerator AIMoveDelayCoroutine()
+    {
+        yield return new WaitForSeconds(Random.Range(0.5f, 2f)); // 0.5 second delay
+        TriggerAITurn();
+    }
+
+    // AI logic is now delegated to an AI class
+    private IGameAI aiLogic;
+
+    private void TriggerAITurn()
+    {
+        // Defensive: Only act if game is ongoing and it's AI's turn
+        if (gameResult.Value != (int)GameResult.Ongoing || currentTurn.Value != aiSymbol)
+            return;
+
+        if (aiLogic == null)
+            aiLogic = new BasicRandomAI();
+
+        List<int> boardCopy = new(boardState.Count);
+        for (int i = 0; i < boardState.Count; i++)
+            boardCopy.Add(boardState[i]);
+
+        // If AI hasn't used slide, and wants to slide, do so
+        var aiPlayerController = FindObjectsByType<PlayerController>(FindObjectsSortMode.None)
+            .FirstOrDefault(pc => pc.playerSymbol.Value == aiSymbol);
+        bool canSlide = aiPlayerController != null && !aiPlayerController.hasUsedSlide.Value && CanSlide(aiSymbol);
+        if (canSlide && aiLogic.ShouldSlide(boardCopy, aiSymbol, humanSymbol))
+        {
+            SlideDirection direction = aiLogic.ChooseSlideDirection(boardCopy, aiSymbol, humanSymbol);
+            SlideBoardServerRpc(direction, aiSymbol);
+            return;
+        }
+
+        int chosenCell = aiLogic.ChooseMove(boardCopy, aiSymbol, humanSymbol);
+        if (chosenCell >= 0)
+            MakeMoveServerRpc(chosenCell, aiSymbol);
     }
 
     private bool IsValidMove(int cellIndex, int playerSymbol)
@@ -188,8 +271,12 @@ public class GameStateManager : NetworkBehaviour
         {
             restartRequests.Add(clientId);
         }
-        // Only restart if both players have requested
-        if (restartRequests.Count >= 2)
+        // Restart immediately in singleplayer, otherwise require both players
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
+        {
+            ResetGameInternal();
+        }
+        else if (restartRequests.Count >= 2)
         {
             ResetGameInternal();
         }
@@ -202,6 +289,14 @@ public class GameStateManager : NetworkBehaviour
         ResetSlideUsage();
         ClearPieces();
         ClearRestartRequests();
+
+        // If singleplayer and AI's turn, trigger AI move
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer &&
+            currentTurn.Value == aiSymbol &&
+            gameResult.Value == (int)GameResult.Ongoing)
+        {
+            StartCoroutine(AIMoveDelayCoroutine());
+        }
     }
 
     private void ResetBoard()

@@ -25,7 +25,10 @@ public class MainMenuController : MonoBehaviour
     void OnSingleplayerClicked()
     {
         GameModeManager.SelectedMode = GameModeManager.GameMode.Singleplayer;
-        SceneManager.LoadScene("Game");
+        NetworkManager.Singleton.StartHost();
+        NetworkManager.Singleton.SceneManager.LoadScene("Game", LoadSceneMode.Single);
+        // Optionally: block external connections in singleplayer
+        // Example: NetworkManager.Singleton.ConnectionApprovalCallback = (request, response) => { response.Approved = false; };
     }
 
     void OnHostClicked()

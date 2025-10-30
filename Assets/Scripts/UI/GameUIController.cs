@@ -105,9 +105,19 @@ public class GameUIController : MonoBehaviour
             buttonManager.SetSlideButtonEnabled(false);
             return;
         }
-        bool bothPlayersPresent = !NetworkManager.Singleton.IsHost || GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 2;
-        bool canSlide = bothPlayersPresent && !localPlayerController.hasUsedSlide.Value && GameStateManager.Instance.gameResult.Value == (int)GameResult.Ongoing;
-        buttonManager.UpdateSlideButton(bothPlayersPresent, canSlide);
+
+        bool canSlide = false;
+        if (GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
+        {
+            canSlide = !localPlayerController.hasUsedSlide.Value && GameStateManager.Instance.gameResult.Value == (int)GameResult.Ongoing;
+            buttonManager.UpdateSlideButton(true, canSlide); // Always show enabled in singleplayer
+        }
+        else
+        {
+            bool bothPlayersPresent = GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 2;
+            canSlide = bothPlayersPresent && !localPlayerController.hasUsedSlide.Value && GameStateManager.Instance.gameResult.Value == (int)GameResult.Ongoing;
+            buttonManager.UpdateSlideButton(bothPlayersPresent, canSlide);
+        }
     }
 
     private void UpdateOverlayAndTurnLabelVisibility(bool showOverlay)
@@ -117,16 +127,35 @@ public class GameUIController : MonoBehaviour
 
     private void UpdateTurnLabelText()
     {
-        // Show 'Waiting for opponent...' if only one player is present
+        // Show AI turn indicator in singleplayer
+        if (GameStateManager.Instance != null && GameModeManager.SelectedMode == GameModeManager.GameMode.Singleplayer)
+        {
+            int currentTurn = GameStateManager.Instance.currentTurn.Value;
+            int aiSymbol = typeof(GameStateManager).GetField("aiSymbol", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(GameStateManager.Instance) is int val ? val : (int)PlayerSymbol.O;
+            if (currentTurn == aiSymbol)
+            {
+                turnLabel.text = "AI is thinking...";
+                return;
+            }
+            else
+            {
+                turnLabel.text = "Your turn";
+                return;
+            }
+        }
+
+        // Show 'Waiting for opponent...' if only one player is present (multiplayer only)
         if (GameStateManager.Instance != null && GameStateManager.Instance.playerSymbols.Count == 1)
         {
             turnLabel.text = "Waiting for opponent...";
             return;
         }
+
         
         if (localPlayerController != null && localPlayerController.IsSpawned)
         {
             int currentTurn = GameStateManager.Instance.currentTurn.Value;
+            Debug.Log($"UpdateTurnLabelText: localPlayerController.playerSymbol.Value={localPlayerController.playerSymbol.Value}, currentTurn={currentTurn}");
             turnLabel.text = localPlayerController.playerSymbol.Value == currentTurn ? "Your turn" : "Opponent's turn";
             return;
         }

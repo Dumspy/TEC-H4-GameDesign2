@@ -9,12 +9,14 @@ public static class PlayerManager
         if (!playerSymbols.ContainsKey(clientId))
         {
             int symbol = playerSymbols.Count == 0 ? (int)PlayerSymbol.X : (int)PlayerSymbol.O;
-            playerSymbols[clientId] = symbol;
+            playerSymbols.Add(clientId, symbol);
+            Debug.Log($"AssignPlayerSymbol: Assigning symbol {symbol} to clientId {clientId}");
             var playerControllers = Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
             foreach (var pc in playerControllers)
             {
                 if (pc.OwnerClientId == clientId && pc.IsSpawned)
                 {
+                    Debug.Log($"AssignPlayerSymbol: Setting playerSymbol.Value={symbol} for PlayerController with OwnerClientId={pc.OwnerClientId}");
                     pc.playerSymbol.Value = symbol;
                     break;
                 }
