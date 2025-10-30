@@ -225,8 +225,7 @@ public class GameStateManager : NetworkBehaviour
         if (gameResult.Value != (int)GameResult.Ongoing || currentTurn.Value != aiSymbol)
             return;
 
-        if (aiLogic == null)
-            aiLogic = new BasicRandomAI();
+        aiLogic ??= new BasicRandomAI();
 
         List<int> boardCopy = new(boardState.Count);
         for (int i = 0; i < boardState.Count; i++)
@@ -240,7 +239,6 @@ public class GameStateManager : NetworkBehaviour
         {
             SlideDirection direction = aiLogic.ChooseSlideDirection(boardCopy, aiSymbol, humanSymbol);
             SlideBoardServerRpc(direction, aiSymbol);
-            return;
         }
 
         int chosenCell = aiLogic.ChooseMove(boardCopy, aiSymbol, humanSymbol);
