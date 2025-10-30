@@ -1,12 +1,11 @@
 using UnityEngine;
 using Unity.Netcode;
 
+[RequireComponent(typeof(Renderer))]
 public class PieceNetworkSync : NetworkBehaviour
 {
     public int cellIndex; // Track which cell this piece is in
-
-    public NetworkVariable<int> playerSymbol = new NetworkVariable<int>();
-
+    public NetworkVariable<int> playerSymbol = new();
     public Material xMaterial;
     public Material oMaterial;
 
@@ -19,12 +18,11 @@ public class PieceNetworkSync : NetworkBehaviour
     private void UpdateMaterial()
     {
         var renderer = GetComponent<Renderer>();
-        if (renderer != null)
+        renderer.material = playerSymbol.Value switch
         {
-            if (playerSymbol.Value == (int)PlayerSymbol.X && xMaterial != null)
-                renderer.material = xMaterial;
-            else if (playerSymbol.Value == (int)PlayerSymbol.O && oMaterial != null)
-                renderer.material = oMaterial;
-        }
+            (int)PlayerSymbol.X => xMaterial,
+            (int)PlayerSymbol.O => oMaterial,
+            _ => renderer.material
+        };
     }
 }

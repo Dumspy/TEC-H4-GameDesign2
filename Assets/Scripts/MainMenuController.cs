@@ -39,6 +39,5 @@ public class MainMenuController : MonoBehaviour
     {
         GameModeManager.SelectedMode = GameModeManager.GameMode.Client;
         NetworkManager.Singleton.StartClient();
-        // Do NOT load scene here; server will move us
     }
 }

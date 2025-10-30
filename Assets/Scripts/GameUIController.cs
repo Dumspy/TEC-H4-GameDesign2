@@ -107,7 +107,7 @@ public class GameUIController : MonoBehaviour
     {
         int restartCount = GameStateManager.Instance.restartRequests != null ? GameStateManager.Instance.restartRequests.Count : 0;
         restartButton.text = $"Restart ({restartCount}/2)";
-        ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+        ulong localId = NetworkManager.Singleton.LocalClientId;
         bool alreadyClicked = GameStateManager.Instance.restartRequests != null && GameStateManager.Instance.restartRequests.Contains(localId);
         restartButton.SetEnabled(!alreadyClicked);
     }
@@ -139,7 +139,7 @@ public class GameUIController : MonoBehaviour
     {
         if (GameStateManager.Instance != null)
         {
-            ulong localId = Unity.Netcode.NetworkManager.Singleton.LocalClientId;
+            ulong localId = NetworkManager.Singleton.LocalClientId;
             GameStateManager.Instance.RequestRestartServerRpc(localId);
             restartButton.SetEnabled(false); // Disable button after click
         }

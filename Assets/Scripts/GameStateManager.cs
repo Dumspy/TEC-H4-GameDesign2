@@ -462,4 +462,3 @@ public class GameStateManager : NetworkBehaviour
         return GameResult.Ongoing;
     }
 }
-
