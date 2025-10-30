@@ -219,11 +219,14 @@ public class GameStateManager : NetworkBehaviour
 
     private void ResetSlideUsage()
     {
+        // Reset slide usage for all player controllers
         var playerControllers = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
         foreach (var pc in playerControllers)
         {
             pc.hasUsedSlide.Value = false;
         }
+        // Also reset slideUsedBySymbol dictionary
+        slideUsedBySymbol.Clear();
     }
 
     private void ClearPieces()
