@@ -4,12 +4,10 @@ using UnityEngine;
 public class SlideDirectionUIManager
 {
     private readonly Label slideDirectionLabel;
-    private readonly MonoBehaviour invoker;
 
-    public SlideDirectionUIManager(Label label, MonoBehaviour invoker)
+    public SlideDirectionUIManager(Label label)
     {
         slideDirectionLabel = label;
-        this.invoker = invoker;
     }
 
     public void ShowSlideDirection(SlideDirection direction)
@@ -24,8 +22,6 @@ public class SlideDirectionUIManager
         };
         slideDirectionLabel.text = dirText;
         slideDirectionLabel.style.display = DisplayStyle.Flex;
-        invoker.CancelInvoke(nameof(HideSlideDirection));
-        invoker.Invoke(nameof(HideSlideDirection), 1f);
     }
 
     public void HideSlideDirection()

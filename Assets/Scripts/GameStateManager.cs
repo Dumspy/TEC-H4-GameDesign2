@@ -32,6 +32,16 @@ public class GameStateManager : NetworkBehaviour
         BoardManager.SlideBoard(boardState, direction);
         lastSlideDirection = direction;
         PieceManager.UpdatePieceVisuals(boardState, cellPositions, placeablePrefab);
+        ShowSlideDirectionClientRpc(direction);
+    }
+
+    [ClientRpc]
+    private void ShowSlideDirectionClientRpc(SlideDirection direction)
+    {
+        if (GameUIController.Instance != null)
+        {
+            GameUIController.Instance.ShowSlideDirection(direction);
+        }
     }
     
     public static GameStateManager Instance { get; private set; }

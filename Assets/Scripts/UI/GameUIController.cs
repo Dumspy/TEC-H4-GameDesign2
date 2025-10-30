@@ -51,7 +51,7 @@ public class GameUIController : MonoBehaviour
         slideButton.clicked += OnSlideClicked;
         slideButton.text = "Slide";
 
-        slideDirectionUIManager = new SlideDirectionUIManager(slideDirectionLabel, this);
+        slideDirectionUIManager = new SlideDirectionUIManager(slideDirectionLabel);
         resultOverlayManager = new ResultOverlayManager(resultOverlay, resultLabel);
         buttonManager = new GameUIButtonManager(restartButton, slideButton);
     }
@@ -137,6 +137,18 @@ public class GameUIController : MonoBehaviour
         SlideDirection direction = (SlideDirection)Random.Range(0, 4);
         localPlayerController.TrySlideBoard(direction);
         buttonManager.SetSlideButtonEnabled(false);
+        // UI indication now handled by ClientRpc
+    }
+
+    public void ShowSlideDirection(SlideDirection direction)
+    {
         slideDirectionUIManager.ShowSlideDirection(direction);
+        CancelInvoke(nameof(HideSlideDirection));
+        Invoke(nameof(HideSlideDirection), 1f);
+    }
+
+    public void HideSlideDirection()
+    {
+        slideDirectionUIManager.HideSlideDirection();
     }
 }
