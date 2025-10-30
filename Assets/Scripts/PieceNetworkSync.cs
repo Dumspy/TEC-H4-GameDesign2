@@ -1,28 +1,42 @@
 using UnityEngine;
 using Unity.Netcode;
 
-[RequireComponent(typeof(Renderer))]
 public class PieceNetworkSync : NetworkBehaviour
 {
     public int cellIndex; // Track which cell this piece is in
     public NetworkVariable<int> playerSymbol = new();
-    public Material xMaterial;
-    public Material oMaterial;
+    public GameObject crossPrefab;
+    public GameObject oPrefab;
 
     public override void OnNetworkSpawn()
     {
-        UpdateMaterial();
-        playerSymbol.OnValueChanged += (oldVal, newVal) => UpdateMaterial();
+        UpdateSymbolPrefab();
+        playerSymbol.OnValueChanged += (oldVal, newVal) => UpdateSymbolPrefab();
     }
 
-    private void UpdateMaterial()
+    private void UpdateSymbolPrefab()
     {
-        var renderer = GetComponent<Renderer>();
-        renderer.material = playerSymbol.Value switch
+        // Destroy any existing child prefab
+        foreach (Transform child in transform)
         {
-            (int)PlayerSymbol.X => xMaterial,
-            (int)PlayerSymbol.O => oMaterial,
-            _ => renderer.material
-        };
+            Destroy(child.gameObject);
+        }
+
+        GameObject prefabToSpawn = null;
+        if (playerSymbol.Value == (int)PlayerSymbol.X)
+        {
+            prefabToSpawn = crossPrefab;
+        }
+        else if (playerSymbol.Value == (int)PlayerSymbol.O)
+        {
+            prefabToSpawn = oPrefab;
+        }
+
+        if (prefabToSpawn != null)
+        {
+            var instance = Instantiate(prefabToSpawn, transform);
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+        }
     }
 }
