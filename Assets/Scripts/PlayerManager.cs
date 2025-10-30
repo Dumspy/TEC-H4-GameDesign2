@@ -10,7 +10,7 @@ public static class PlayerManager
         {
             int symbol = playerSymbols.Count == 0 ? (int)PlayerSymbol.X : (int)PlayerSymbol.O;
             playerSymbols[clientId] = symbol;
-            var playerControllers = Object.FindObjectsOfType<PlayerController>();
+            var playerControllers = Object.FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
             foreach (var pc in playerControllers)
             {
                 if (pc.OwnerClientId == clientId && pc.IsSpawned)

@@ -151,6 +151,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PieceNetworkSync
   ShowTopMostFoldoutHeaderGroup: 1
+  cellIndex: 0
   playerSymbol:
     m_InternalValue: 0
   xMaterial: {fileID: 2100000, guid: c4fd6ad872dfc5243981fc3106e789e0, type: 2}
